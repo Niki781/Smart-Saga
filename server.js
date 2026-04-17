@@ -120,74 +120,74 @@ function initMQTT() {
       });
     });
 
-// ==================== handle massage dan setingan jam ==========
-mqttClient.on("message", async (topic, message) => {
-  let db = null;
-  try {
-    const payload = JSON.parse(message.toString());
-    if (!payload?.rf_id) return;
+    // ==================== handle massage dan setingan jam ==========
+    mqttClient.on("message", async (topic, message) => {
+      let db = null;
+      try {
+        const payload = JSON.parse(message.toString());
+        if (!payload?.rf_id) return;
 
-    db = await mysql.createConnection(dbConfig);
+        db = await mysql.createConnection(dbConfig);
 
-    // Ambil setting jam
-    const [[setting]] = await db.execute(`
+        // Ambil setting jam
+        const [[setting]] = await db.execute(`
       SELECT jam_masuk, jam_pulang FROM setting_jam LIMIT 1
     `);
 
-    const now = new Date();
-    const jamSekarang = now.toTimeString().slice(0, 8);
+        const now = new Date();
+        const jamSekarang = now.toTimeString().slice(0, 8);
 
-    // Cek sudah ada absen hari ini atau belum
-    const [cek] = await db.execute(`
+        // Cek sudah ada absen hari ini atau belum
+        const [cek] = await db.execute(`
       SELECT * FROM absensi_log
       WHERE card_uid = ? AND DATE(tanggal) = CURDATE()
     `, [payload.rf_id]);
 
-    // ======================
-    // ✅ BELUM ABSEN → MASUK
-    // ======================
-    if (cek.length === 0) {
-      await db.execute(`
+        // ======================
+        // ✅ BELUM ABSEN → MASUK
+        // ======================
+        if (cek.length === 0) {
+          await db.execute(`
         INSERT INTO absensi_log
         (card_uid, mac, tanggal, jam_masuk, status)
         VALUES (?, ?, CURDATE(), ?, 'Hadir')
       `, [payload.rf_id, payload.mac, jamSekarang]);
 
-      console.log("✅ MASUK:", payload.rf_id);
-    }
+          console.log("✅ MASUK:", payload.rf_id);
+        }
 
-    // ======================
-    // ✅ SUDAH ABSEN → CEK PULANG
-    // ======================
-    else {
-      // ❌ BELUM WAKTU PULANG
-      if (jamSekarang < setting.jam_pulang) {
-        console.log("🚫 hey jangan bolos!!");
+        // ======================
+        // ✅ SUDAH ABSEN → CEK PULANG
+        // ======================
+        else {
+          // ❌ BELUM WAKTU PULANG
+          if (jamSekarang < setting.jam_pulang) {
+            console.log("🚫 hey jangan bolos!!");
 
-        // optional kirim ke mqtt device / buzzer
-        mqttClient.publish("absensi/notif", JSON.stringify({
-          message: "hey jangan bolos!!"
-        }));
+            // optional kirim ke mqtt device / buzzer
+            mqttClient.publish("absensi/notif", JSON.stringify({
+              message: "hey jangan bolos!!"
+            }));
 
-        return;
-      }
+            return;
+          }
 
-      // ✅ UPDATE JADI PULANG
-      await db.execute(`
+          // ✅ UPDATE JADI PULANG
+          await db.execute(`
         UPDATE absensi_log
         SET jam_masuk = ?, status = 'Pulang'
         WHERE card_uid = ? AND DATE(tanggal) = CURDATE()
       `, [jamSekarang, payload.rf_id]);
 
-      console.log("🏁 PULANG:", payload.rf_id);
-    }
+          console.log("🏁 PULANG:", payload.rf_id);
+        }
 
-  } catch (err) {
-    console.error("MQTT ERROR:", err.message);
-  } finally {
-    if (db) await db.end();
-  }
-});
+      } catch (err) {
+        console.error("MQTT ERROR:", err.message);
+      } finally {
+        if (db) await db.end();
+      }
+    });
 
   } catch (err) {
     console.error("INIT MQTT ERROR:", err.message);
@@ -229,11 +229,11 @@ app.post("/login", async (req, res) => {
     // Hybrid check: hash bcrypt atau plain text
     let isMatch = false;
     if (user.password.startsWith('$2b$') || user.password.startsWith('$2a$')) {
-        isMatch = await bcrypt.compare(password, user.password);
+      isMatch = await bcrypt.compare(password, user.password);
     } else {
-        isMatch = (password === user.password);
+      isMatch = (password === user.password);
     }
-    
+
     if (!isMatch) {
       return res.status(400).json({ success: false, message: "Password salah" });
     }
@@ -477,11 +477,11 @@ app.get("/logout", (req, res) => {
 app.post("/api/kartu", auth("admin"), async (req, res) => {
   try {
     const db = await mysql.createConnection(dbConfig);
-    const {card_uid, nama, kelas} = req.body;
+    const { card_uid, nama, kelas } = req.body;
 
     await db.execute(`
       INSERT INTO data_mapping(card_uid, nama, kelas) VALUES (?, ?, ?)`,
-    [card_uid, nama, kelas]);
+      [card_uid, nama, kelas]);
 
     await db.end();
 
@@ -644,7 +644,7 @@ app.post("/api/users", async (req, res) => {
 
     const db = await mysql.createConnection(dbConfig);
     const hashed = await bcrypt.hash(password, 10);
-   
+
     await db.execute(
       "INSERT INTO users (username, password, roles_id) VALUES (?, ?, ?)",
       [username, hashed, roles_id]
@@ -1079,7 +1079,7 @@ app.get("/api/export_excelBulan", auth("admin"), async (req, res) => {
 });
 
 // ====================== START SERVER ======================
-app.listen(PORT, async () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
-  await reconnectMQTT();
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("Server jalan di port", PORT);
 });
